@@ -11,7 +11,7 @@ convert_to_24bit_48khz() {
         else
             # Convert to 24-bit, 48kHz with maximum quality resampling and dithering
             echo "---Converting \"$file\" to 24-bit, 48kHz"
-            if ffmpeg -y -i "$file" -c:a flac -sample_fmt s32 -ar 48000 -af "aresample=resampler=soxr:precision=33:dither_method=shibata" "${file%.flac}_24bit_48khz.flac"; then
+            if ffmpeg -y -i "$file" -c:a flac -sample_fmt s32 -ar 48000 -af "aresample=resampler=soxr:precision=28:dither_method=triangular" "${file%.flac}_24bit_48khz.flac"; then
                 mv -v "${file%.flac}_24bit_48khz.flac" "$file"
             else
                 echo "FFMpeg failure, A B O R T i n g"; exit 1
