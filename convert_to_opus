@@ -1,0 +1,40 @@
+#!/bin/bash
+
+convert_to_opus() {
+    find "$1" -type f -iname "*.flac" -print0 | xargs -0 -I {} bash -c '
+        file="${1}"  
+        output="${file%.flac}.opus"
+
+        # Check if the file is already 24-bit and 48kHz
+        bit_depth=$(ffmpeg -i "$file" 2>&1 | grep -oP "Stream.*Audio:.*?(\d+) Hz, \d+ channels, s(\d+)")
+        sample_rate=$(ffmpeg -i "$file" 2>&1 | grep -oP "Stream.*Audio:.*?(\d+) Hz, \d+ channels, s\d+" | grep -oP "(\d+) Hz")
+
+        if [[ $bit_depth =~ s24 && $sample_rate -eq 48000 ]]; then
+            echo "Skipping \"$file\" (already 24-bit, 48kHz)"
+            convert_needed=0
+        else
+            echo "Converting \"$file\" to 24-bit, 48kHz"
+            convert_needed=1
+        fi
+
+        # Convert to Opus (128 kbps VBR) with optional resampling
+        echo "Encoding \"$file\" to Opus"
+        if [[ $convert_needed -eq 1 ]]; then
+            ffmpeg -y -i "$file" -c:a flac -sample_fmt s32 -ar 48000 -af "aresample=resampler=soxr:precision=28:dither_method=triangular" - | \
+            ffmpeg -y -i - -c:a libopus -b:a 128k -vbr on -map_metadata 0 "$output"
+        else
+            ffmpeg -y -i "$file" -c:a libopus -b:a 128k -vbr on -map_metadata 0 "$output"
+        fi
+
+        if [[ $? -eq 0 ]]; then
+            echo "Successfully converted: $output"
+        else
+            echo "Conversion failed for: $file"
+            exit 1
+        fi
+    ' _ {}
+}
+
+# Start from current directory or specified directory
+start_dir="${1:-.}"
+convert_to_opus "$start_dir"
